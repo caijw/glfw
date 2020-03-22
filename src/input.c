@@ -334,6 +334,14 @@ void _glfwInputMouseClick(_GLFWwindow* window, int button, int action, int mods)
         window->callbacks.mouseButton((GLFWwindow*) window, button, action, mods);
 }
 
+void _glfwTouch(_GLFWwindow* window, double x, double y, int action, uint32_t time, int32_t id)
+{
+    if (window->callbacks.touch)
+    {
+        window->callbacks.touch((GLFWwindow*) window, x, y, action, time, id);
+    }
+}
+
 // Notifies shared code of a cursor motion event
 // The position is specified in content area relative screen coordinates
 //
@@ -826,6 +834,73 @@ GLFWAPI void glfwSetCursor(GLFWwindow* windowHandle, GLFWcursor* cursorHandle)
     _glfwPlatformSetCursor(window, cursor);
 }
 
+_GLFWtouch* glfwGetTouch(_GLFWwindow* window, int32_t id)
+{
+    _GLFWtouch* touch;
+    for (touch = _glfw.touchListHead; touch; touch = touch->next)
+    {
+        if (touch->wl.id == id)
+        {   
+            break;
+        }
+    }
+    return touch;
+}
+
+_GLFWtouch* glfwCreateTouch(_GLFWwindow* window, uint32_t time, int32_t id, double x, double y)
+{
+    _GLFWtouch* touch;
+
+    _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
+
+    touch = calloc(1, sizeof(_GLFWtouch));
+    touch->wl.ctime = touch->wl.utime = time;
+    touch->wl.id = id;
+    touch->wl.x = x;
+    touch->wl.y = y;
+    return touch;
+}
+
+_GLFWtouch* glfwUpdateTouch(_GLFWwindow* window, uint32_t time, int32_t id, double x, double y)
+{
+    _GLFWtouch* touch = glfwGetTouch(window, id);
+    if (touch)
+    {   
+        touch->wl.utime = time;
+        touch->wl.x = x;
+        touch->wl.y = y;
+    }
+    return touch;
+}
+
+GLFWbool glfwDestroyTouch(_GLFWtouch* touch)
+{
+
+    _GLFW_REQUIRE_INIT_OR_RETURN(GLFW_FALSE);
+
+    if (touch == NULL)
+        return GLFW_FALSE;
+
+    _GLFWtouch* preTouch;
+    _GLFWtouch* curTouch;
+    for (curTouch = _glfw.touchListHead; curTouch; curTouch = curTouch->next)
+    {
+        if (curTouch == touch)
+        {   
+            if (curTouch == _glfw.touchListHead) {
+                _glfw.touchListHead = curTouch->next;
+            } else {
+                preTouch->next = curTouch->next;
+            }
+            free(curTouch);
+            return GLFW_TRUE;
+        } else {
+            preTouch = curTouch;
+        }
+    }
+    return GLFW_FALSE;
+}
+
 GLFWAPI GLFWkeyfun glfwSetKeyCallback(GLFWwindow* handle, GLFWkeyfun cbfun)
 {
     _GLFWwindow* window = (_GLFWwindow*) handle;
@@ -907,6 +982,16 @@ GLFWAPI GLFWdropfun glfwSetDropCallback(GLFWwindow* handle, GLFWdropfun cbfun)
 
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
     _GLFW_SWAP_POINTERS(window->callbacks.drop, cbfun);
+    return cbfun;
+}
+// 注册 touch 回调
+GLFWAPI GLFWtouchfun glfwSetTouchCallback(GLFWwindow* handle, GLFWtouchfun cbfun)
+{
+    _GLFWwindow* window = (_GLFWwindow*) handle;
+    assert(window != NULL);
+
+    _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
+    _GLFW_SWAP_POINTERS(window->callbacks.touch, cbfun);
     return cbfun;
 }
 

@@ -315,6 +315,34 @@ extern "C" {
  *  @ingroup input
  */
 #define GLFW_REPEAT                 2
+/*! @brief touch down.
+ *
+ *  touch down.
+ *
+ *  @ingroup input
+ */
+#define GLFW_TOUCH_DOWN             0
+/*! @brief touch move.
+ *
+ *  touch move.
+ *
+ *  @ingroup input
+ */
+#define GLFW_TOUCH_MOVE             1
+/*! @brief touch up.
+ *
+ *  touch up.
+ *
+ *  @ingroup input
+ */
+#define GLFW_TOUCH_UP               2
+/*! @brief touch cancel.
+ *
+ *  touch cancel.
+ *
+ *  @ingroup input
+ */
+#define GLFW_TOUCH_CANCEL           3
 /*! @} */
 
 /*! @defgroup hat_state Joystick hat states
@@ -1168,6 +1196,18 @@ typedef struct GLFWwindow GLFWwindow;
  */
 typedef struct GLFWcursor GLFWcursor;
 
+/*! @brief Opaque touch object.
+ *
+ *  Opaque touch object.
+ *
+ *  @see @ref touch_object
+ *
+ *  @since Added in version 3.3.
+ *
+ *  @ingroup input
+ */
+typedef struct GLFWtouch GLFWtouch;
+
 /*! @brief The function pointer type for error callbacks.
  *
  *  This is the function pointer type for error callbacks.  An error callback
@@ -1570,6 +1610,33 @@ typedef void (* GLFWcharmodsfun)(GLFWwindow*,unsigned int,int);
  *  @ingroup input
  */
 typedef void (* GLFWdropfun)(GLFWwindow*,int,const char*[]);
+
+/*! @brief The function pointer type for touch callbacks.
+ *
+ *  This is the function pointer type for touch callbacks.  A touch
+ *  callback function has the following signature:
+ *  @code
+ *  void function_name(GLFWwindow* window, int button, int action, int mods)
+ *  @endcode
+ *
+ *  @param[in] window The window that received the event.
+ *  @param[in] button The [mouse button](@ref buttons) that was pressed or
+ *  released.
+ *  @param[in] action One of `GLFW_PRESS` or `GLFW_RELEASE`.  Future releases
+ *  may add more actions.
+ *  @param[in] mods Bit field describing which [modifier keys](@ref mods) were
+ *  held down.
+ *
+ *  @sa @ref input_mouse_button
+ *  @sa @ref glfwSetMouseButtonCallback
+ *
+ *  @since Added in version 3.3.
+ *  @glfw3 Added window handle and modifier mask parameters.
+ *
+ *  @ingroup input
+ */
+// touch 事件回调函数签名
+typedef void (* GLFWtouchfun)(GLFWwindow*,double,double,int,uint32_t,int32_t);
 
 /*! @brief The function pointer type for monitor configuration callbacks.
  *
@@ -4763,6 +4830,36 @@ GLFWAPI GLFWcursorenterfun glfwSetCursorEnterCallback(GLFWwindow* window, GLFWcu
  *  @ingroup input
  */
 GLFWAPI GLFWscrollfun glfwSetScrollCallback(GLFWwindow* window, GLFWscrollfun callback);
+
+/*! @brief Sets the touch callback.
+ *
+ *  This function sets the touch callback of the specified window
+ *
+ *
+ *  @param[in] window The window whose callback to set.
+ *  @param[in] callback The new touch callback, or `NULL` to remove the
+ *  currently set callback.
+ *  @return The previously set callback, or `NULL` if no callback was set or the
+ *  library had not been [initialized](@ref intro_init).
+ *
+ *  @callback_signature
+ *  @code
+ *  void function_name(GLFWwindow* window, double x, double y, int action, uint32_t time)
+ *  @endcode
+ *  For more information about the callback parameters, see the
+ *  [function pointer type](@ref GLFWtouchfun).
+ *
+ *  @errors Possible errors include @ref GLFW_NOT_INITIALIZED.
+ *
+ *  @thread_safety This function must only be called from the main thread.
+ *
+ *  @sa @ref touch
+ *
+ *  @since Added in version 3.3.
+ *
+ *  @ingroup input
+ */
+GLFWAPI GLFWtouchfun glfwSetTouchCallback(GLFWwindow* window, GLFWtouchfun callback);
 
 /*! @brief Sets the path drop callback.
  *

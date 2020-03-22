@@ -40,10 +40,23 @@
 #include <unistd.h>
 #include <wayland-client.h>
 
+#include <stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include <time.h>
+#include <execinfo.h>
 
 static inline int min(int n1, int n2)
 {
     return n1 < n2 ? n1 : n2;
+}
+
+static inline int timestamp()
+{
+    time_t t;
+    t = time(NULL);
+    int ii = time(&t);
+    return ii;
 }
 
 static _GLFWwindow* findWindowFromDecorationSurface(struct wl_surface* surface,
@@ -100,14 +113,14 @@ static void pointerHandleEnter(void* data,
             return;
     }
 
-    window->wl.decorations.focus = focus;
+    window->wl.decorations.focus = focus; // 点击的是上/下/左/右/主窗口的哪一个
     _glfw.wl.serial = serial;
-    _glfw.wl.pointerFocus = window;
+    _glfw.wl.pointerFocus = window; // 记录 pointer 是在哪个 window 的
 
     window->wl.hovered = GLFW_TRUE;
 
-    _glfwPlatformSetCursor(window, window->wl.currentCursor);
-    _glfwInputCursorEnter(window, GLFW_TRUE);
+    _glfwPlatformSetCursor(window, window->wl.currentCursor); // 设置 cursor 图像
+    _glfwInputCursorEnter(window, GLFW_TRUE); // 通知 enter 回调
 }
 
 static void pointerHandleLeave(void* data,
@@ -115,6 +128,7 @@ static void pointerHandleLeave(void* data,
                                uint32_t serial,
                                struct wl_surface* surface)
 {
+
     _GLFWwindow* window = _glfw.wl.pointerFocus;
 
     if (!window)
@@ -173,6 +187,7 @@ static void setCursor(_GLFWwindow* window, const char* name)
     _glfw.wl.cursorPreviousName = name;
 }
 
+
 static void pointerHandleMotion(void* data,
                                 struct wl_pointer* pointer,
                                 uint32_t time,
@@ -193,12 +208,14 @@ static void pointerHandleMotion(void* data,
 
     switch (window->wl.decorations.focus)
     {
-        case mainWindow:
+        case mainWindow: // 点击了主窗口
+            // 坐标缓存
             window->wl.cursorPosX = x;
             window->wl.cursorPosY = y;
-            _glfwInputCursorPos(window, x, y);
+            _glfwInputCursorPos(window, x, y); // 通知 cursorPos 回调
             _glfw.wl.cursorPreviousName = NULL;
             return;
+        // 其他的各种位置的 cursorName 可以参考 https://www.w3schools.com/cssref/playit.asp?filename=playcss_cursor&preval=n-resize
         case topDecoration:
             if (y < _GLFW_DECORATION_WIDTH)
                 cursorName = "n-resize";
@@ -228,6 +245,7 @@ static void pointerHandleMotion(void* data,
         default:
             assert(0);
     }
+    // cursorName 发生变化
     if (_glfw.wl.cursorPreviousName != cursorName)
         setCursor(window, cursorName);
 }
@@ -247,8 +265,10 @@ static void pointerHandleButton(void* data,
 
     if (!window)
         return;
+    // left button
     if (button == BTN_LEFT)
     {
+        // 鼠标的左键，移动窗口/窗口大小调整
         switch (window->wl.decorations.focus)
         {
             case mainWindow:
@@ -297,6 +317,7 @@ static void pointerHandleButton(void* data,
                                         serial, edges);
         }
     }
+    // right button
     else if (button == BTN_RIGHT)
     {
         if (window->wl.decorations.focus != mainWindow && window->wl.xdg.toplevel)
@@ -310,8 +331,11 @@ static void pointerHandleButton(void* data,
     }
 
     // Don’t pass the button to the user if it was related to a decoration.
-    if (window->wl.decorations.focus != mainWindow)
+    if (window->wl.decorations.focus != mainWindow){
+        // 点击的不是主窗口
         return;
+    }
+        
 
     _glfw.wl.serial = serial;
 
@@ -324,7 +348,7 @@ static void pointerHandleButton(void* data,
                          state == WL_POINTER_BUTTON_STATE_PRESSED
                                 ? GLFW_PRESS
                                 : GLFW_RELEASE,
-                         _glfw.wl.xkb.modifiers);
+                         _glfw.wl.xkb.modifiers); // 通知 click 回调
 }
 
 static void pointerHandleAxis(void* data,
@@ -351,7 +375,7 @@ static void pointerHandleAxis(void* data,
     else if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL)
         y = wl_fixed_to_double(value) * scrollFactor;
 
-    _glfwInputScroll(window, x, y);
+    _glfwInputScroll(window, x, y); // 通知 scroll 回调
 }
 
 static const struct wl_pointer_listener pointerListener = {
@@ -673,6 +697,165 @@ static const struct wl_keyboard_listener keyboardListener = {
 #endif
 };
 
+// add wrapped touch to glfw window object
+static GLFWbool addTouch(_GLFWwindow* window,
+                    struct wl_touch *wl_touch,
+                    uint32_t time,
+                    int32_t id,
+                    wl_fixed_t sx,
+                    wl_fixed_t sy)
+{
+    double x = wl_fixed_to_double(sx);
+    double y = wl_fixed_to_double(sy);
+    _GLFWtouch* touch = glfwCreateTouch(window, time, id, x, y);
+    if (touch) {
+        // add to link
+        touch->next = _glfw.touchListHead;
+        _glfw.touchListHead = touch;
+        return GLFW_TRUE;
+    } else {
+        return GLFW_FALSE;
+    }
+}
+// update wrapped touch on glfw window object
+static GLFWbool updateTouch(_GLFWwindow* window,
+                    struct wl_touch *wl_touch,
+                    uint32_t time,
+                    int32_t id,
+                    wl_fixed_t sx,
+                    wl_fixed_t sy)
+{
+    double x = wl_fixed_to_double(sx);
+    double y = wl_fixed_to_double(sy);
+    _GLFWtouch* touch = glfwUpdateTouch(window, time, id, x, y);
+    return touch ? GLFW_TRUE : GLFW_FALSE;
+}
+
+// touch down
+static void touchHandleDown(void *data,
+		                    struct wl_touch *wl_touch,
+		                    uint32_t serial,
+		                    uint32_t time,
+		                    struct wl_surface *surface,
+		                    int32_t id,
+		                    wl_fixed_t sx,
+		                    wl_fixed_t sy)
+{
+    // Happens in the case we just destroyed the surface.
+    if (!surface)
+        return;
+    _GLFWwindow* window = wl_surface_get_user_data(surface);
+    if (!window)
+    {
+        window = findWindowFromDecorationSurface(surface, NULL);
+        if (!window)
+            return;
+    }
+
+    _glfw.wl.serial = serial;
+    _glfw.wl.touchFocus = window;
+    double x = wl_fixed_to_double(sx);
+    double y = wl_fixed_to_double(sy);
+    _glfwTouch(window, x, y, GLFW_TOUCH_DOWN, time, id);
+    addTouch(window, wl_touch, time, id, sx, sy);
+}
+
+// wayland 没有给 touch up 的坐标信息
+// 还得把最后一次的坐标（down/motion）缓存起来，在这里给 flutter
+static void touchHandleUp(void *data,
+		                  struct wl_touch *wl_touch,
+		                  uint32_t serial,
+		                  uint32_t time,
+		                  int32_t id)
+{
+    // printf("[c++][glfw][touchHandleUp][%d]serial %d, time %d, id %d,\n", timestamp(), serial, time, id);
+    _GLFWwindow* window = _glfw.wl.touchFocus;
+
+    if (!window)
+        return;
+    _glfw.wl.serial = serial;
+    _GLFWtouch* touch= glfwGetTouch(window, id);
+    if (touch) {
+        _glfwTouch(window, touch->wl.x, touch->wl.y, GLFW_TOUCH_UP, time, id);
+        glfwDestroyTouch(touch);
+        _glfw.wl.touchFocus = NULL;
+    }
+}
+
+static void touchHandleMotion(void *data,
+		                      struct wl_touch *wl_touch,
+		                      uint32_t time,
+		                      int32_t id,
+		                      wl_fixed_t sx,
+		                      wl_fixed_t sy)
+{
+    // printf("[c++][glfw][touchHandleMotion][%d]time %d, id %d, x %d, y %d,\n", timestamp(), time, id, sx, sy);
+    _GLFWwindow* window = _glfw.wl.touchFocus;
+    if (!window)
+        return;
+    double x = wl_fixed_to_double(sx);
+    double y = wl_fixed_to_double(sy);
+    _glfwTouch(window, x, y, GLFW_TOUCH_MOVE, time, id);
+    updateTouch(window, wl_touch, time, id, sx, sy);
+}
+
+static void touchHandleFrame(void *data,
+		                     struct wl_touch *wl_touch)
+{
+    // currently do nothing
+}
+
+// Touch cancellation applies to all touch points
+// currently active on this client's surface.
+// https://wayland.freedesktop.org/docs/html/apa.html#protocol-spec-wl_touch
+static void touchHandleCancel(void *data,
+		                      struct wl_touch *wl_touch)
+{
+    _GLFWwindow* window = _glfw.wl.touchFocus;
+
+    if (!window)
+        return;
+    // 现在所有的touch都是存在全局的，没有区分window
+    // TODO 后面看看有没有必要区分哪个 window 对应哪些 touch
+    _GLFWtouch* touch;
+    _GLFWtouch* preTouch;
+    for (touch = _glfw.touchListHead; touch;)
+    {
+        _glfwTouch(window, touch->wl.x, touch->wl.y, GLFW_TOUCH_CANCEL, 0, touch->wl.id);
+        preTouch = touch;
+        touch = touch->next;
+        free(preTouch);
+    }
+    _glfw.wl.touchFocus = NULL;
+}
+
+static void touchHandleShape(void *data,
+		                     struct wl_touch *wl_touch,
+		                     int32_t id,
+		                     wl_fixed_t major,
+		                     wl_fixed_t minor)
+{
+  // currently do nothing  
+}
+
+static void touchHandleOrientation(void *data,
+			                       struct wl_touch *wl_touch,
+			                       int32_t id,
+			                       wl_fixed_t orientation)
+{
+  // currently do nothing
+}
+
+static const struct wl_touch_listener touchListener = {
+    touchHandleDown,
+    touchHandleUp,
+    touchHandleMotion,
+    touchHandleFrame,
+    touchHandleCancel,
+    touchHandleShape,
+    touchHandleOrientation,
+};
+
 static void seatHandleCapabilities(void* data,
                                    struct wl_seat* seat,
                                    enum wl_seat_capability caps)
@@ -697,6 +880,16 @@ static void seatHandleCapabilities(void* data,
     {
         wl_keyboard_destroy(_glfw.wl.keyboard);
         _glfw.wl.keyboard = NULL;
+    }
+
+    if ( (caps & WL_SEAT_CAPABILITY_TOUCH) && !_glfw.wl.touch ) {
+        // 监听 touch
+        _glfw.wl.touch = wl_seat_get_touch(seat);
+        wl_touch_add_listener(_glfw.wl.touch, &touchListener, NULL);
+    } else if (!(caps & WL_SEAT_CAPABILITY_TOUCH) && _glfw.wl.touch) {
+        // 释放监听 touch
+        wl_touch_destroy(_glfw.wl.touch);
+        _glfw.wl.touch = NULL;
     }
 }
 

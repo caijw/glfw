@@ -74,6 +74,7 @@ typedef VkBool32 (APIENTRY *PFN_vkGetPhysicalDeviceWaylandPresentationSupportKHR
 #define _GLFW_PLATFORM_LIBRARY_WINDOW_STATE _GLFWlibraryWayland wl
 #define _GLFW_PLATFORM_MONITOR_STATE        _GLFWmonitorWayland wl
 #define _GLFW_PLATFORM_CURSOR_STATE         _GLFWcursorWayland  wl
+#define _GLFW_PLATFORM_TOUCH_STATE          _GLFWtouchWayland   wl
 
 #define _GLFW_PLATFORM_CONTEXT_STATE         struct { int dummyContext; }
 #define _GLFW_PLATFORM_LIBRARY_CONTEXT_STATE struct { int dummyLibraryContext; }
@@ -232,6 +233,7 @@ typedef struct _GLFWlibraryWayland
     struct wl_seat*             seat;
     struct wl_pointer*          pointer;
     struct wl_keyboard*         keyboard;
+    struct wl_touch*            touch;
     struct wl_data_device_manager*          dataDeviceManager;
     struct wl_data_device*      dataDevice;
     struct wl_data_offer*       dataOffer;
@@ -308,6 +310,7 @@ typedef struct _GLFWlibraryWayland
 
     _GLFWwindow*                pointerFocus;
     _GLFWwindow*                keyboardFocus;
+    _GLFWwindow*                touchFocus;
 
     struct {
         void*                   handle;
@@ -354,6 +357,15 @@ typedef struct _GLFWcursorWayland
     int                         currentImage;
 } _GLFWcursorWayland;
 
+// Wayland-specific per-touch data
+//
+typedef struct _GLFWtouchWayland
+{
+    uint32_t ctime;
+    uint32_t utime;
+    uint32_t id;
+    double x, y;
+} _GLFWtouchWayland;
 
 void _glfwAddOutputWayland(uint32_t name, uint32_t version);
 

@@ -70,6 +70,7 @@ typedef struct _GLFWwindow      _GLFWwindow;
 typedef struct _GLFWlibrary     _GLFWlibrary;
 typedef struct _GLFWmonitor     _GLFWmonitor;
 typedef struct _GLFWcursor      _GLFWcursor;
+typedef struct _GLFWtouch       _GLFWtouch;
 typedef struct _GLFWmapelement  _GLFWmapelement;
 typedef struct _GLFWmapping     _GLFWmapping;
 typedef struct _GLFWjoystick    _GLFWjoystick;
@@ -413,6 +414,7 @@ struct _GLFWwindow
         GLFWcharfun             character;
         GLFWcharmodsfun         charmods;
         GLFWdropfun             drop;
+        GLFWtouchfun            touch;
     } callbacks;
 
     // This is defined in the window API's platform.h
@@ -451,6 +453,16 @@ struct _GLFWcursor
 
     // This is defined in the window API's platform.h
     _GLFW_PLATFORM_CURSOR_STATE;
+};
+
+// Cursor structure
+//
+struct _GLFWtouch
+{
+    _GLFWtouch*    next;
+
+    // This is defined in the window API's platform.h
+    _GLFW_PLATFORM_TOUCH_STATE;
 };
 
 // Gamepad mapping element structure
@@ -526,6 +538,7 @@ struct _GLFWlibrary
     _GLFWerror*         errorListHead;
     _GLFWcursor*        cursorListHead;
     _GLFWwindow*        windowListHead;
+    _GLFWtouch*         touchListHead;
 
     _GLFWmonitor**      monitors;
     int                 monitorCount;
@@ -720,6 +733,7 @@ void _glfwInputChar(_GLFWwindow* window,
                     unsigned int codepoint, int mods, GLFWbool plain);
 void _glfwInputScroll(_GLFWwindow* window, double xoffset, double yoffset);
 void _glfwInputMouseClick(_GLFWwindow* window, int button, int action, int mods);
+void _glfwTouch(_GLFWwindow* window, double x, double y, int action, uint32_t time, int32_t id);
 void _glfwInputCursorPos(_GLFWwindow* window, double xpos, double ypos);
 void _glfwInputCursorEnter(_GLFWwindow* window, GLFWbool entered);
 void _glfwInputDrop(_GLFWwindow* window, int count, const char** names);
@@ -739,6 +753,10 @@ void _glfwInputError(int code, const char* format, ...);
 #endif
 
 
+_GLFWtouch* glfwGetTouch(_GLFWwindow* window, int32_t id);
+_GLFWtouch* glfwCreateTouch(_GLFWwindow* window, uint32_t time, int32_t id, double x, double y);
+_GLFWtouch* glfwUpdateTouch(_GLFWwindow* window, uint32_t time, int32_t id, double x, double y);
+GLFWbool glfwDestroyTouch(_GLFWtouch* handle);
 //////////////////////////////////////////////////////////////////////////
 //////                       GLFW internal API                      //////
 //////////////////////////////////////////////////////////////////////////
